@@ -1,0 +1,78 @@
+#!/usr/bin/python
+import simplejson as json
+
+from argparse import ArgumentParser
+from os import path
+from sys import exit
+
+script_name = path.basename(__file__)
+
+parser = ArgumentParser()
+parser.add_argument('file_name',
+                    metavar='FILE', help='CloudFormation json file')
+
+parser.add_argument('sections', metavar='SECTIONS', default='Resources',
+                    nargs='?', help='A csv list of sections to display in the output')
+
+parser.add_argument('resource', metavar='RESOURCE', nargs='?',
+                    help='A single resource to display')
+
+parser.add_argument('-n', '--names', '--show-names', action="store_true",
+                    help='Show the name of an individual resource')
+
+parser.add_argument('-i', '--indent', metavar='INDENT', type=int,
+                    default=4, help='Indent size of the json output')
+
+args = parser.parse_args()
+
+
+with open(args.file_name) as stack_json:
+    try:
+        stack = json.load(stack_json)
+    except json.JSONDecodeError:
+        print("%s: %s is not valid json. Exiting" % (script_name, args.file_name))
+        exit(1)
+
+
+# these meta keys do not contain resources so we drop them
+unneeded_keys = ['AWSTemplateFormatVersion', 'Description']
+[stack.pop(k, None) for k in unneeded_keys]
+
+if args.sections == 'sections':
+    for section in sorted(stack.keys()):
+        print section
+    exit(0)
+
+
+if args.sections:
+    sections = args.sections.split(',')
+    sections = [s.capitalize() for s in sections]
+
+    # verify all the section names exist in the json
+    for section in sections:
+        if section not in stack.keys():
+            print("%s: section '%s' is not in the template" % (script_name, section))
+            exit(1)
+else:
+    sections = stack.keys()
+
+
+# if we had a single argument then display all the entries for that section
+if not args.resource:
+    for section in sorted(sections):
+        for resource in sorted(stack[section].keys()):
+            resource_type = stack[section][resource].get("Type", section)
+
+            print("%s\n%s\n" % (resource, resource_type))
+    exit(0)
+
+
+# if we had two arguments then expand a single resource
+if args.resource in stack[section].keys():
+    if args.names:
+        print '"%s" : ' % args.resource,
+
+    print(json.dumps(stack[section].get(args.resource), stack, indent=args.indent * ' '))
+else:
+    print("Resource [%s] was not found in the [%s] section" % (args.resource, section))
+    exit(1)
