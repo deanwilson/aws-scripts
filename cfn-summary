@@ -1,9 +1,9 @@
 #!/usr/bin/python
 import simplejson as json
+import sys
 
 from argparse import ArgumentParser
 from os import path
-from sys import exit
 
 script_name = path.basename(__file__)
 
@@ -20,12 +20,12 @@ with open(args.file_name) as stack_json:
     try:
         stack = json.load(stack_json)
     except json.JSONDecodeError:
-        print("%s: %s is not valid json." % (script_name, args.file_name))
-        exit(1)
+        sys.stderr.write("%s: %s is not valid json.\n" % (script_name, args.file_name))
+        sys.exit(1)
 
 
 # these meta keys do not contain resources so we drop them
-unneeded_keys = ['AWSTemplateFormatVersion', 'Description']
+unneeded_keys = ('AWSTemplateFormatVersion', 'Description')
 [stack.pop(k, None) for k in unneeded_keys]
 
 
@@ -36,12 +36,12 @@ if args.sections:
     # verify all the section names exist in the json
     for section in sections:
         if section not in stack.keys():
-            print("%s: section '%s' is not in the template" % (script_name, section))
-            exit(1)
+            sys.stderr.write("%s: section '%s' is not in the template\n" % (script_name, section))
+            sys.exit(1)
 else:
     sections = stack.keys()
 
 
 for section in sorted(sections):
     resources = len(stack[section])
-    print("%s has %s resources" % (section, resources))
+    print("%s has %d resources" % (section, resources))
