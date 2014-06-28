@@ -1,6 +1,6 @@
 # cfn-summary #
 
-The cfn summary command provides an overview of a CloudFormation json
+The cfn-summary command provides an overview of a CloudFormation json
 templates contents.
 
     $ cfn-summary templates/web-app.json
