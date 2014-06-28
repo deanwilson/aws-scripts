@@ -1,0 +1,47 @@
+#!/usr/bin/python
+import simplejson as json
+
+from argparse import ArgumentParser
+from os import path
+from sys import exit
+
+script_name = path.basename(__file__)
+
+parser = ArgumentParser()
+parser.add_argument('file_name',
+                    metavar='FILE', help='CloudFormation json file')
+parser.add_argument('--sections',  metavar='SECTIONS',
+                    help='sections to display in the output')
+
+args = parser.parse_args()
+
+
+with open(args.file_name) as stack_json:
+    try:
+        stack = json.load(stack_json)
+    except json.JSONDecodeError:
+        print("%s: %s is not valid json." % (script_name, args.file_name))
+        exit(1)
+
+
+# these meta keys do not contain resources so we drop them
+unneeded_keys = ['AWSTemplateFormatVersion', 'Description']
+[stack.pop(k, None) for k in unneeded_keys]
+
+
+if args.sections:
+    sections = args.sections.split(',')
+    sections = [s.capitalize() for s in sections]
+
+    # verify all the section names exist in the json
+    for section in sections:
+        if section not in stack.keys():
+            print("%s: section '%s' is not in the template" % (script_name, section))
+            exit(1)
+else:
+    sections = stack.keys()
+
+
+for section in sorted(sections):
+    resources = len(stack[section])
+    print("%s has %s resources" % (section, resources))
