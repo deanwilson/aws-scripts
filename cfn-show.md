@@ -1,6 +1,6 @@
 # cfn-show #
 
-The cfn-show command provides a number of differnt views of a CloudFormation json
+The cfn-show command provides a number of different views of a CloudFormation json
 templates contents.
 
 The basic command will display all the names of all resources in a given
