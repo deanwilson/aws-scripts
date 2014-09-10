@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+
+import argparse
+import boto.ec2
+import boto.rds2
+import logging
+import sys
+
+
+boiler_plate = """
+
+This script creates an association between an RDS instance and an SNS
+topic. Both of which should already exist. This subscription places
+events from categories like 'failover' and 'configuration changes' from
+the RDS instance on to the given SNS topic.
+
+ Create a new event subscription.
+   %(name)s -n event_sub_name   -i rds-inst-phy-id   -t arn:snip:snip   -r eu-west-1
+
+ Create a new event subscription and show boto debug
+   %(name)s -n event_sub_name   -i rds-inst-phy-id   -t arn:snip:snip   -r eu-west-1 --debug
+
+Notes
+
+ - this does not use the environment variables for setting region yet.
+ - it currently adds -all- the event types for a given source.
+
+""" % {'name': sys.argv[0]}
+
+
+regions = [x.name for x in boto.ec2.connect_to_region('us-east-1').get_all_regions()]
+
+parser = argparse.ArgumentParser(
+    description=('Create an RDS Event Subscription'),
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=boiler_plate)
+
+parser.add_argument('-n', '--name', metavar="NAME",
+                    help='The subscriptions name')
+
+parser.add_argument('-i', '--instance', '--rds-instance',
+                    metavar="INSTANCE_ID",
+                    help='The RDS instance Physical ID')
+
+parser.add_argument('-t', '--topic', '--topic-arn', metavar="TOPIC_ARN",
+                    help='The SNS Topics ARN')
+
+parser.add_argument('--source-type', metavar="TYPE",
+                    nargs='?', default='db-instance',
+                    help='The source type. Defaults to db-instance')
+
+parser.add_argument('-r', '--region', metavar="REGION",
+                    help='AWS REGION containing the RDS instance and SNS topic')
+
+parser.add_argument('-d', '--debug', action='store_true',
+                    help='Disply debug')
+
+args = parser.parse_args()
+
+# Validate the region
+if args.region not in regions:
+    parser.error("REGION: %s (region must be one of : %s)" % (args.region, ', '.join(sorted(regions))))
+
+
+if args.debug:
+    logging.basicConfig(level=logging.DEBUG)
+
+
+conn = boto.rds2.connect_to_region(args.region)
+events = conn.describe_event_categories(source_type=args.source_type)
+
+rds_events = events['DescribeEventCategoriesResponse']['DescribeEventCategoriesResult']['EventCategoriesMapList'][0]['EventCategories']
+
+conn.create_event_subscription(
+    args.name, args.topic, source_type=args.source_type, enabled=True,
+    source_ids=args.instance, event_categories=rds_events)
