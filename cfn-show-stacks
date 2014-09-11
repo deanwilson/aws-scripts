@@ -1,0 +1,75 @@
+#/usr/bin/ruby
+require 'aws'
+require 'optparse'
+
+def pluralise(count, singular, plural)
+  count > 1 ? plural : singular
+end
+
+#############################################
+
+options = {}
+options['summary'] = false
+options['regions'] = AWS.regions.to_a.collect { |r| r.name }
+options['resource_count'] = false
+options['resource_details'] = false
+options['everything'] = false
+
+
+OptionParser.new do |opts|
+  opts.on('-e', '--everything', '--show-all') do |v| 
+    options['everything'] = v   
+    options['summary'] = false
+    options['resource_count'] = true
+    options['resource_details'] = true
+  end
+
+  opts.on('-s', '--summary') { |v| options['summary'] = v }
+
+  opts.on('--resource-count') { |v| options['resource_count'] = v }
+
+  opts.on('--resource-details') { |v| options['resource_details'] = v }
+
+  opts.on('-r', '--region REGION', '--regions') do |region|
+    options['regions'] = region.split(',').to_a
+  end
+end.parse!
+
+options['regions'].sort!
+
+#############################################
+
+options['regions'].each do |region|
+  cfm = AWS::CloudFormation.new(:region => region)
+
+  num_stacks = cfm.stacks.to_a.length
+  next unless num_stacks > 0
+
+  if options['summary']
+    puts "#{region} (#{num_stacks} " + pluralise(num_stacks, 'stack', 'stacks') + ')'
+    next
+  end
+
+  stack_names = cfm.stacks.to_a.collect { |s| s.name }
+  longest_name = stack_names.max_by{ |n| n.length }.length
+
+  cfm.stacks.sort_by { |s| s.name }.each do |stack|
+    stack_name = stack.name.ljust(longest_name, ' ')
+    output = "#{stack_name} #{stack.status.downcase} #{region}"
+
+    if options['resource_count']
+       resource_count = stack.resources.count
+       output += " #{resource_count} " + pluralise(resource_count, 'resource', 'resources')
+    end
+
+    puts output
+
+    if options['resource_details']
+      puts "  --  Resources:"
+      stack.resources.each do |resource|
+        puts "    --  #{resource.logical_resource_id} #{resource.resource_type}"
+      end
+    end
+
+  end
+end
