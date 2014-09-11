@@ -9,6 +9,7 @@ end
 #############################################
 
 options = {}
+options['stack_names'] = '.*'
 options['summary'] = false
 options['regions'] = AWS.regions.to_a.collect { |r| r.name }
 options['resource_count'] = false
@@ -22,13 +23,21 @@ OptionParser.new do |opts|
     options['summary'] = false
     options['resource_count'] = true
     options['resource_details'] = true
+    options['parameters'] = true
+    options['outputs'] = true
   end
 
   opts.on('-s', '--summary') { |v| options['summary'] = v }
 
+  opts.on('-o', '--outputs') { |v| options['outputs'] = v } # TODO
+
+  opts.on('-p', '--parameters') { |v| options['parameters'] = v }
+
   opts.on('--resource-count') { |v| options['resource_count'] = v }
 
   opts.on('--resource-details') { |v| options['resource_details'] = v }
+
+  opts.on('--name NAME', '--stack-name') { |name| options['stack_names'] = name }
 
   opts.on('-r', '--region REGION', '--regions') do |region|
     options['regions'] = region.split(',').to_a
@@ -54,6 +63,8 @@ options['regions'].each do |region|
   longest_name = stack_names.max_by{ |n| n.length }.length
 
   cfm.stacks.sort_by { |s| s.name }.each do |stack|
+    next unless stack.name.match(/#{options['stack_names']}/)
+
     stack_name = stack.name.ljust(longest_name, ' ')
     output = "#{stack_name} #{stack.status.downcase} #{region}"
 
@@ -68,6 +79,13 @@ options['regions'].each do |region|
       puts "  --  Resources:"
       stack.resources.each do |resource|
         puts "    --  #{resource.logical_resource_id} #{resource.resource_type}"
+      end
+    end
+
+    if options['parameters']
+      puts "  --  Parameters:"
+      stack.parameters.sort_by { |a| a[0] }.each do |name, value|
+        puts "    --  #{name} == #{value}"
       end
     end
 
