@@ -1,3 +1,21 @@
+# aws-regions #
+
+A simple command line tool to print the AWS region code and description.
+Written to stop people asking 'Is that one Virginia?'
+
+    $ aws-regions
+    ap-northeast-1                 Asia Pacific (Tokyo)
+    ... snip ...
+    us-west-2                      US West (Oregon)
+
+    $ aws-regions ap-
+    ap-northeast-1                 Asia Pacific (Tokyo)
+    ap-southeast-1                 Asia Pacific (Singapore)
+    ap-southeast-2                 Asia Pacific (Sydney)
+
+    $ aws-regions eu-central-1
+    EU (Frankfurt)
+
 # cfn-show #
 
 The cfn-show command provides a number of different views of a CloudFormation json
