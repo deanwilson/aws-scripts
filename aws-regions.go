@@ -12,6 +12,8 @@ func main() {
 
 	regions := map[string]string{
 		"ap-northeast-1": "Asia Pacific (Tokyo)",
+		"ap-northeast-2": "Asia Pacific (Seoul)",
+		"ap-south-1":     "Asia Pacific (Mumbai)",
 		"ap-southeast-1": "Asia Pacific (Singapore)",
 		"ap-southeast-2": "Asia Pacific (Sydney)",
 		"eu-central-1":   "EU (Frankfurt)",
