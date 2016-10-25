@@ -1,3 +1,20 @@
+# aws-ips #
+
+A command to fetch the official Amazon IP ranges and provide a few filtering
+options to restrict the ranges returned.
+
+    Show all IPv4 addresses in the sa-east-1 and eu-west-1 regions
+    aws-ips --region sa-east-1,eu-west-1
+
+    Show all services in the data file
+    aws-ips --services
+
+    Show all IPv6 addresses in the ap-northeast-1 region
+    aws-ips -r ap-northeast-1 -i 6
+
+    Show all IPv4 addresses used by the EC2 service in eu-west-1
+    aws-ips --region eu-west-1 --service EC2
+
 # aws-regions #
 
 A simple command line tool to print the AWS region code and description.

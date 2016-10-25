@@ -1,0 +1,145 @@
+#!/usr/bin/ruby
+require 'json'
+require 'net/http'
+require 'optparse'
+require 'set'
+require 'uri'
+require 'yaml'
+
+app_name = File.basename $PROGRAM_NAME
+
+def get_address_ranges(url)
+  ip_source = URI(url)
+
+  res = Net::HTTP.get_response(ip_source)
+
+  if res.code.to_i != 200
+    echo "Failed to read IP addresses from #{ip_source}"
+    exit 1
+  end
+
+  json = JSON.load(res.body)
+
+  addresses = json['prefixes'] + json['ipv6_prefixes']
+  addresses.flatten!
+
+  addresses
+end
+
+def available(collection, key_name)
+  collected = Set.new
+  collection.collect { |e| collected.add(e[key_name]) }
+
+  collected.to_a.sort
+end
+
+options = {
+  ip_versions: ['4'],
+  debug: false,
+  url: 'https://ip-ranges.amazonaws.com/ip-ranges.json',
+}
+
+OptionParser.new do |opts|
+  opts.banner = 'Usage: #{app_name} [options]'
+
+  opts.on(
+    '-d', '--debug', 'Show the results as a YAML array of hashes'
+  ) { options[:debug] = true }
+
+  opts.on(
+    '-iVERSION', '--ip=VERSION', '--ip_version=VERSION', 'Which IP versions to show. Defaults to IPv4'
+  ) { |v| options[:ip_versions] = v.split(',') }
+
+  opts.on(
+    '-rregion',  '--region=region', 'comma separated list of regions to show.'
+  ) { |v| options[:region] = v.split(',') }
+
+  opts.on(
+    '--regions', 'Show the regions available in the fetched data.'
+  ) { options[:regions] = true }
+
+  opts.on(
+    '-sSERVICE', '--service=SERVICE', 'Comma separated list of services to show'
+  ) { |v| options[:service] = v.split(',') }
+
+  opts.on(
+    '--services', 'Show the services available in the fetched data.'
+  ) { options[:services] = true }
+
+  opts.on(
+    '-uURL', '--url=URL', 'URL to fetch IP Ranges from'
+  ) { |v| options[:url] = v.split(',') }
+
+  opts.separator <<-EOT
+
+    Examples:
+
+      Show all IPv4 addresses in the sa-east-1 and eu-west-1 regions
+      #{app_name} --region sa-east-1,eu-west-1
+
+      Show all services in the data file
+      #{app_name} --services
+
+      Show all IPv6 addresses in the ap-northeast-1 region
+      #{app_name} -r ap-northeast-1 -i 6
+
+      Show all IPv4 addresses used by the EC2 service in eu-west-1
+      #{app_name} --region eu-west-1 --service EC2
+
+  EOT
+end.parse!
+
+addresses = get_address_ranges(options[:url])
+
+regions  = available(addresses, 'region')
+services = available(addresses, 'service')
+
+# display the valid values and exit early if called with --regions or --services
+if options[:regions]
+  puts regions.to_yaml
+  exit 0
+end
+
+if options[:services]
+  puts services.to_yaml
+  exit 0
+end
+
+## Sanity check that the regions and service names provided are present in the
+## datafile
+if options[:region]
+  options[:region].each do |region|
+    unless regions.include? region
+      puts "#{app_name}: #{region} is not a valid region. Use --regions to list valid options"
+      exit 0
+    end
+  end
+end
+
+if options[:service]
+  options[:service].each do |service|
+    unless services.include? service
+      puts "#{app_name}: #{service} is not a valid service. Use --services to list valid options"
+      exit 0
+    end
+  end
+end
+
+
+# select IP versions based on command line options. Default to showing IPv4
+addresses.reject! { |e| e.key? 'ipv6_prefix' } unless options[:ip_versions].include? '6'
+addresses.reject! { |e| e.key? 'ip_prefix'   } unless options[:ip_versions].include? '4'
+
+# filter out to the regions we care about
+addresses.select! { |e| options[:region].include? e['region'] } if options[:region]
+
+# only show the services we care about
+addresses.select! { |e| options[:service].include? e['service'] } if options[:service]
+
+# in debug mode show the data we get from the remote URL.
+if options[:debug]
+  puts addresses.to_yaml
+else
+  ips = addresses.collect { |e| e['ip_prefix'] || e['ipv6_prefix'] }
+  puts ips.sort.to_yaml
+end
