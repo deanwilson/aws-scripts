@@ -16,6 +16,7 @@ func main() {
 		"ap-south-1":     "Asia Pacific (Mumbai)",
 		"ap-southeast-1": "Asia Pacific (Singapore)",
 		"ap-southeast-2": "Asia Pacific (Sydney)",
+		"ca-central-1":   "Canada (Central)",
 		"eu-central-1":   "EU (Frankfurt)",
 		"eu-west-1":      "EU (Ireland)",
 		"sa-east-1":      "South America (Sao Paulo)",
