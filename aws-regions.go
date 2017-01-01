@@ -19,6 +19,7 @@ func main() {
 		"ca-central-1":   "Canada (Central)",
 		"eu-central-1":   "EU (Frankfurt)",
 		"eu-west-1":      "EU (Ireland)",
+		"eu-west-2":      "EU (London)",
 		"sa-east-1":      "South America (Sao Paulo)",
 		"us-east-1":      "US East (N. Virginia)",
 		"us-east-2":      "US East (Ohio)",
