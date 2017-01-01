@@ -141,5 +141,6 @@ if options[:debug]
   puts addresses.to_yaml
 else
   ips = addresses.collect { |e| e['ip_prefix'] || e['ipv6_prefix'] }
+  ips.uniq!
   puts ips.sort.to_yaml
 end
