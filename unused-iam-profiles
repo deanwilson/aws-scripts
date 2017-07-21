@@ -6,10 +6,16 @@ iam = AWS::IAM::Client.new
 iam_roles = {}
 ec2_roles = []
 
-# todo make this a merge add to avoid being all side effect
-iam.list_instance_profiles[:instance_profiles].collect { |i|
-  iam_roles[i[:instance_profile_id]] = i[:instance_profile_name]
-}
+truncated = true
+marker = nil
+while truncated == true do
+  resp = marker.nil? ? iam.list_instance_profiles : iam.list_instance_profiles(marker: marker)
+  resp[:instance_profiles].collect { |i|
+    iam_roles[i[:instance_profile_id]] = i[:instance_profile_name]
+  }
+  marker = resp[:marker]
+  truncated = resp[:is_truncated]
+end
 
 # get the instance profile ids from all instances in all regions
 AWS.regions.each do |region|
@@ -24,7 +30,6 @@ end
 ec2_roles    = ec2_roles.compact.sort
 iam_role_ids = iam_roles.keys.compact.sort!
 unused_ids   = iam_role_ids - ec2_roles
-
 
 puts "#{ unused_ids.count } of #{ iam_role_ids.count } IAM Profiles are unused ## BETA!"
 
