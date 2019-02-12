@@ -1,0 +1,170 @@
+#!/usr/bin/env python
+
+from collections import defaultdict
+
+import argparse
+import boto.iam
+import ConfigParser
+import os
+import sys
+
+class IAMDetails(object):
+
+    def __init__(self, config, args):
+        self.config = config
+        self.connection = self.get_connection()
+
+        # the first method in each return all the information, second method only the names.
+        #########################
+
+        if args.users:
+            self.users = self.get_users()
+            self.user_names = [user['user_name'] for user in sorted(self.users)]
+
+        if args.groups:
+            self.groups = self.get_groups()
+            self.group_names = [group['group_name'] for group in sorted(self.groups)]
+
+        if args.roles:
+            self.roles = self.get_roles()
+            self.role_names = [role['role_name'] for role in sorted(self.roles)]
+
+        if args.instances:
+            self.instance_profiles = self.get_instance_profiles()
+            self.instance_profile_names = [ip['role_name'] for ip in sorted(self.roles)]
+
+        #########################
+
+    def credentials(self):
+        creds = defaultdict(str)
+
+        cred_names = { 'AWS_ACCESS_KEY': 'aws_access_key_id',
+                       'AWS_SECRET_KEY': 'aws_secret_access_key'}
+
+        for envname, confname in cred_names.iteritems():
+            if envname in os.environ.keys():
+                creds[cred_names[envname]] = os.environ.get(envname)
+            elif cred_names[envname] in self.config:
+                creds[cred_names[envname]] = self.config['confname']
+            else:
+                self.unknown_error(3, 'No value for {} could be found').format(envname)
+
+        return(creds)
+
+    def get_connection(self):
+        access_key_id     = self.config['aws_access_key_id']
+        secret_access_key = self.config['aws_secret_access_key']
+
+        connection = boto.iam.connection.IAMConnection(
+            aws_access_key_id     = access_key_id,
+            aws_secret_access_key = secret_access_key
+        )
+
+        return connection
+
+
+    def get_groups(self):
+        return self.get_connection().get_all_groups().groups
+
+    def get_users(self):
+        return self.get_connection().get_all_users().users
+
+    def get_roles(self):
+        # TODO normalise down the cloud formation random part
+        return self.get_connection().list_roles().roles
+
+    def get_instance_profiles(self):
+        # TODO normalise down the cloud formation random part
+        return self.get_connection().list_instance_profiles().instance_profiles
+
+    def unknown_error(self, code, msg):
+        sys.stderr.write("{}\n".format(msg))
+        sys.exit(int(code))
+
+
+############################################
+############################################
+############################################
+
+class IAMDiffer(object):
+
+    def __init__(self, environments):
+        self.environments = environments
+
+
+    def diff(self, method):
+        diff = {}
+
+        diff[self.environments[0][0]] = list(set(getattr(self.environments[0][1], method)) - set(getattr(self.environments[1][1], method)))
+        diff[self.environments[1][0]] = list(set(getattr(self.environments[1][1], method)) - set(getattr(self.environments[0][1], method)))
+
+        return diff
+
+
+############################################
+############################################
+############################################
+
+if __name__ == '__main__':
+
+    check_name = os.path.basename(sys.argv[0])
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-f', '--config-file', dest='configfile', action='store',
+        help='The config file to use'
+    )
+    parser.add_argument('-s', '--sections', dest='sections', action='store',
+        help='Comma seperated list of sections to compare. e.g -s prod,dev'
+    )
+
+    parser.add_argument('--users',dest='users',action='store_true')
+    parser.add_argument('--no-users',dest='users',action='store_false')
+    parser.set_defaults(users=True)
+
+    parser.add_argument('--groups',dest='groups',action='store_true')
+    parser.add_argument('--no-groups',dest='groups',action='store_false')
+    parser.set_defaults(groups=True)
+
+    parser.add_argument('--roles',dest='roles',action='store_true')
+    parser.add_argument('--no-roles',dest='roles',action='store_false')
+    parser.set_defaults(roles=False)
+
+    parser.add_argument('--instances',dest='instances',action='store_true')
+    parser.add_argument('--no-instances',dest='instances',action='store_false')
+    parser.set_defaults(instances=False)
+
+
+    args = parser.parse_args()
+    config = ConfigParser.ConfigParser()
+    config.read(args.configfile)
+
+    environments = ['dev', 'prod']
+   
+    # TODO convert to named tuples
+    envs = [
+      (environments[0], IAMDetails(dict(config.items(environments[0])), args)),
+      (environments[1], IAMDetails(dict(config.items(environments[1])), args))
+    ]
+
+    differ = IAMDiffer(envs)
+
+    # TODO - add checks for empty result sets to avoid extra printed lines
+
+    props = {
+        'groups': 'group_names',
+        'users': 'user_names',
+        'roles': 'role_names',
+        'instances': 'role_names'
+    }
+
+    for typ in props:
+        if getattr(args, typ):
+            differences = differ.diff(props[typ])
+            for env in environments:
+                print "{} only in {} ({})".format(typ, env, len(differences[env]))
+                for item in sorted(differences[env]):
+                    print("\t{}").format(item)
+
+                print
+

@@ -1,0 +1,68 @@
+#!/bin/env python
+import sys
+import os
+import argparse
+import ConfigParser
+import boto.ec2
+
+check_name = os.path.basename( sys.argv[0] )
+
+parser = argparse.ArgumentParser()
+config = ConfigParser.ConfigParser()
+
+parser.add_argument('region', help='The AWS region to check')
+parser.add_argument('-f', '--config-file', dest='configfile', action='store',
+        help='The config file to use'
+    )
+args = parser.parse_args()
+
+regions = boto.ec2.regions()
+regions = [ r.name for r in regions ]
+
+if args.region not in regions:
+    sorted_region = ', '.join( sorted( regions ))
+    region_msg    = '{}: region must be one of {}'.format(check_name, sorted_region)
+
+    sys.stderr.write( region_msg )
+    sys.exit(1)
+
+config.read(args.configfile)
+
+if not config.has_section( args.region ):
+    sys.stderr.write( "{}: no config for {} found in {}".format(
+                          check_name, args.region, args.configfile
+                      )
+                    )
+    sys.exit(1)
+
+
+access_key_id     = config.get( args.region, 'aws_access_key_id'     )
+secret_access_key = config.get( args.region, 'aws_secret_access_key' )
+
+conn = boto.ec2.connect_to_region(
+                                     args.region,
+                                     aws_access_key_id     = access_key_id,
+                                     aws_secret_access_key = secret_access_key
+                                 )
+
+owner_ids = config.get( args.region, 'owner_ids' )
+
+images = conn.get_all_images( owners = [ owner_ids ] )
+images = [ i.id for i in images ]
+images = set( images )
+
+amis_in_use = set()
+for reservation in conn.get_all_instances():
+    for instance in reservation.instances:
+        amis_in_use.add( instance.image_id )
+
+
+unused_amis     = images - amis_in_use
+sorted_unused   = ', '.join(sorted(unused_amis))
+
+external_amis   = amis_in_use - images
+sorted_external = ', '.join(sorted(external_amis))
+
+
+print("Region: {} - unused internal AMIs: {}").format( args.region, sorted_unused   )
+print("Region: {} - external AMIs in use: {}").format( args.region, sorted_external )
