@@ -1,0 +1,4 @@
+[us-east-1]
+aws_access_key_id     = FOOFOOFOO
+aws_secret_access_key = FOOFOOFOOSECRETFOOFOOFOO
+owner_ids             = 142069644989
